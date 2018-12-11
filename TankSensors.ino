@@ -13,8 +13,8 @@ const int DBUG = 0;          // Set this to 0 for no serial output for debugging
 //-----------[ CUSTOMIZE ]----------------
 bool CODE_FOR_DOx_DEVICE          = true;
 bool CODE_FOR_TEMPSALINITY_DEVICE = false;
-const char* ssid                  = "HOME-55A2";
-const char* password              = "3E7D73F4CED37FAC";
+const char* ssid                  = "HBOI";
+const char* password              = "1c7146fb30";
 float GV_DOx_TOOHIGHVALUE         = 10.00;
 float GV_DOx_TOOLOWVALUE          = 6.00;
 int LED_DEFAULT_BRIGHTNESS        = 5;
@@ -57,18 +57,6 @@ String GV_SENSOR_DATA = "";            // Holds latest reading from D.O. Circuit
 String GV_SENSOR_RESPONSE = "NONE";  // Holds latest response from D.O. Circuit.
 String GV_WEB_RESPONSE_TEXT ="";
 
-char computerdata[20];           //we make a 20 byte character array to hold incoming data from a pc/mac/other.
-byte received_from_computer = 0; //we need to know how many characters have been received.
-char incoming_data[20];                //we make a 20 byte character array to hold incoming data from the D.O. circuit.
-byte in_char = 0;                //used as a 1 byte buffer to store inbound bytes from the D.O. Circuit.
-int time_ = 600;                 //used to change the delay needed depending on the command sent to the EZO Class D.O. Circuit.
-String DO;                        //char pointer used in string parsing.
-int i = 0;
-char R = 'r';
-char *ReadDOx = &R;
-
-
-
 //---
 unsigned long SensorAutoReadingMillis = millis();  // Stores milliseconds since last D.O. reading.
 unsigned long HeartBeatMillis = millis();
@@ -81,7 +69,7 @@ AsyncWebServer server(80);              // Setup Web Server Port.
 const char* PARAM_MESSAGE = "command";     // HTTP_GET parameter to look for.
 //----------------------------------------
 
-//===============================[ SETUP ]============================
+//=======================================[ SETUP ]================================================
 void setup() {
   Serial.begin(115200);
   //I2C
@@ -163,17 +151,21 @@ void setup() {
  
   //----------------------------------------------------------------------------------------
 }
+//=======================================[ SETUP: END ]=============================================
 
-void LED_FIND_LIGHT_FOR_DOx(){
-  fill_solid(leds, LED_NUMBER_OF_LEDS, CRGB(255,  255,  255));   //white
-  delay(40);
-  FastLED.show();
-  fill_solid(leds, LED_NUMBER_OF_LEDS, CRGB(0,  0,  0));   //white
-  delay(40);
-  FastLED.show();  
-}
 
-//===============================[ LOOP ]==============================
+//-------------------------------[ Variables used in LOOP ]------------
+char computerdata[20];           //we make a 20 byte character array to hold incoming data from a pc/mac/other.
+byte received_from_computer = 0; //we need to know how many characters have been received.
+char incoming_data[20];                //we make a 20 byte character array to hold incoming data from the D.O. circuit.
+byte in_char = 0;                //used as a 1 byte buffer to store inbound bytes from the D.O. Circuit.
+int time_ = 600;                 //used to change the delay needed depending on the command sent to the EZO Class D.O. Circuit.
+String DO;                        //char pointer used in string parsing.
+int i = 0;
+char R = 'r';
+char *ReadDOx = &R;
+
+//=======================================[ LOOP ]===================================================
 void loop() {
   
   if (GV_FIND){                                                         // GV_FIND is set to true if web page ipaddress/findon is called.  Nothing is supposed to function while this is happening.
@@ -232,7 +224,7 @@ void loop() {
   GV_BOOTING_UP=false;
   
 }
-
+//=======================================[ LOOP: END ]================================================
 
 
 //===============================[ FUNCTIONS ]=========================
@@ -252,6 +244,15 @@ void LED_Clear(){
     leds[led] = CRGB::Black;
   }
   FastLED.show();
+}
+
+void LED_FIND_LIGHT_FOR_DOx(){
+  fill_solid(leds, LED_NUMBER_OF_LEDS, CRGB(255,  255,  255));   //white
+  delay(40);
+  FastLED.show();
+  fill_solid(leds, LED_NUMBER_OF_LEDS, CRGB(0,  0,  0));   //white
+  delay(40);
+  FastLED.show();  
 }
 
 void LED_sensor_return_code_Fade(int code){
