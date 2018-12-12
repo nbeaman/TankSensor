@@ -11,10 +11,10 @@ const int DBUG = 0;          // Set this to 0 for no serial output for debugging
 //----------------------------
 
 //-----------[ CUSTOMIZE ]----------------
-bool CODE_FOR_DOx_DEVICE          = true;
-bool CODE_FOR_TEMPSALINITY_DEVICE = false;
-const char* ssid                  = "HBOI";
-const char* password              = "1c7146fb30";
+bool CODE_FOR_DOx_DEVICE          = false;
+bool CODE_FOR_TEMPSALINITY_DEVICE = true;
+const char* ssid                  = "HOME-55A2";
+const char* password              = "3E7D73F4CED37FAC";
 float GV_DOx_TOOHIGHVALUE         = 10.00;
 float GV_DOx_TOOLOWVALUE          = 6.00;
 int LED_DEFAULT_BRIGHTNESS        = 5;
@@ -29,7 +29,7 @@ int LED_DEFAULT_BRIGHTNESS        = 5;
 bool GV_WEB_REQUEST_IN_PROGRESS = false;
 bool GV_READ_REQUEST_IN_PROGRESS = false;
 bool GV_THIS_IS_A_SERIAL_COMMAND = false;
-bool GV_QUERY_DO_NAME_ON_NEXT_COMMAND = true;   // Loop tests first to see if we need to query the DO for it's name.  Set to true to do this first thing
+bool GV_QUERY_SENSOR_NAME_ON_NEXT_COMMAND = true;   // Loop tests first to see if we need to query the DO for it's name.  Set to true to do this first thing
 int GV_FIND=0;
 bool GV_BOOTING_UP = true;
 //----------------------------------------
@@ -101,12 +101,12 @@ void setup() {
   
   IPAddress IP=WiFi.localIP();
   GV_LCD_MAIN_TEXT[0]=String(IP[0]) + '.' + String(IP[1]) + '.' + String(IP[2]) + '.' + String(IP[3]);
-
+  Serial.println(GV_LCD_MAIN_TEXT[0]);
+  
   byte mac[6];
   WiFi.macAddress(mac);
   GV_LCD_MAIN_TEXT[2]=String(mac[5],HEX) + String(mac[4],HEX) + String(mac[3],HEX) + String(mac[2],HEX) + String(mac[1],HEX) + String(mac[0],HEX);
-  
-  //SendCommandToSensorAndSetReturnGVVariables("name,?");          // get the name of the DO sensor to display on the LCD
+  Serial.println(GV_LCD_MAIN_TEXT[2]);
   
   //-----------------[ read web page]-------------------------------
   server.on("/read", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -180,14 +180,20 @@ void loop() {
   }
 
   
-  if (GV_QUERY_DO_NAME_ON_NEXT_COMMAND){              // query DOx name if this is set to true, then display it on the LCD screen.  This is set to run on boot-up and when DOx name was changed. 
-    SendCommandToSensorAndSetReturnGVVariables("name,?\0");
+  if (GV_QUERY_SENSOR_NAME_ON_NEXT_COMMAND){              // query DOx name if this is set to true, then display it on the LCD screen.  This is set to run on boot-up and when DOx name was changed. 
+    if (CODE_FOR_DOx_DEVICE){
+      SendCommandToSensorAndSetReturnGVVariables("name,?\0");
+    }
+    if (CODE_FOR_TEMPSALINITY_DEVICE){
+      SendCommandToSensorAndSetReturnGVVariables("100:name,?\0");
+    }    
+    
     Serial.println(GV_SENSOR_DATA);
     GV_SENSOR_DATA.remove(0,6);
     GV_LCD_MAIN_TEXT[1]=GV_SENSOR_DATA;
     GV_LCD_MAIN_TEXT_INDEX=1;
     LCD_DISPLAY(GV_LCD_MAIN_TEXT[GV_LCD_MAIN_TEXT_INDEX],0,0,ClearLCD,PrintSerial);
-    GV_QUERY_DO_NAME_ON_NEXT_COMMAND = false;
+    GV_QUERY_SENSOR_NAME_ON_NEXT_COMMAND = false;
   }
 
   if (Serial.available() > 0) {                                           //if data is holding in the serial buffer
@@ -204,9 +210,17 @@ void loop() {
   
   if (((millis() - SensorAutoReadingMillis) > 2000) && !GV_WEB_REQUEST_IN_PROGRESS){
     GV_READ_REQUEST_IN_PROGRESS=true;
-    SendCommandToSensorAndSetReturnGVVariables(ReadDOx);
-    LCD_DISPLAY(GV_SENSOR_DATA, 0, 1, NoClearLCD, PrintSerial);
-    LCD_DISPLAY("  ", GV_SENSOR_DATA.length(), 1, NoClearLCD, NoSerial);
+    if (CODE_FOR_DOx_DEVICE){
+      SendCommandToSensorAndSetReturnGVVariables(ReadDOx);
+      LCD_DISPLAY(GV_SENSOR_DATA, 0, 1, NoClearLCD, PrintSerial);
+      LCD_DISPLAY("  ", GV_SENSOR_DATA.length(), 1, NoClearLCD, NoSerial);
+    }
+    if (CODE_FOR_TEMPSALINITY_DEVICE){
+      SendCommandToSensorAndSetReturnGVVariables("102:r");
+      LCD_DISPLAY(GV_SENSOR_DATA + "  ", 0, 1, NoClearLCD, PrintSerial);
+      SendCommandToSensorAndSetReturnGVVariables("100:r");
+      LCD_DISPLAY(GV_SENSOR_DATA + " ", 16-GV_SENSOR_DATA.length(), 1, NoClearLCD, PrintSerial);
+    }
     SensorAutoReadingMillis = millis();
     GV_READ_REQUEST_IN_PROGRESS=false;
   }
@@ -322,27 +336,34 @@ void BUTTON_WasItPressed_ChangeLCD(){
 }
 
 void LCDshowHeartBeat() {
+
   if ((millis() - HeartBeatMillis) > 1000) {
-    if ( (GV_SENSOR_DATA.toFloat() >= GV_DOx_TOOHIGHVALUE) || (GV_SENSOR_DATA.toFloat() <= GV_DOx_TOOLOWVALUE) ){
-        for(int v=0; v<15; v++){
-          fill_solid(leds, LED_NUMBER_OF_LEDS, CRGB(255,  255,    0));          //yellow
-          FastLED.show();
-          delay(30);
-          LED_Clear();
-          delay(30);
-        }
-    }else{
-        if (HeartBeat != ' ') {
-          HeartBeat = ' ';
-          LED_Center_Blue(false);
-        }
-        else {
-          HeartBeat = '*';
-          LED_Center_Blue(true);
-        }
-        if(DBUG==2) Serial.println(HeartBeat);
-        LCD_DISPLAY(&HeartBeat, 15, 0, NoClearLCD, NoSerial);
-    } 
+    
+    if (CODE_FOR_DOx_DEVICE){
+       if ( (GV_SENSOR_DATA.toFloat() >= GV_DOx_TOOHIGHVALUE) || (GV_SENSOR_DATA.toFloat() <= GV_DOx_TOOLOWVALUE) ){
+          for(int v=0; v<15; v++){
+            fill_solid(leds, LED_NUMBER_OF_LEDS, CRGB(255,  255,    0));          //yellow
+            FastLED.show();
+            delay(30);
+            LED_Clear();
+            delay(30);
+          }
+      }   
+    }
+    if (CODE_FOR_TEMPSALINITY_DEVICE){
+      //put code here
+    }
+    if (HeartBeat != ' ') {
+      HeartBeat = ' ';
+      LED_Center_Blue(false);
+    }
+    else {
+      HeartBeat = '*';
+      LED_Center_Blue(true);
+    }
+    if(DBUG==2) Serial.println(HeartBeat);
+    LCD_DISPLAY(&HeartBeat, 15, 0, NoClearLCD, NoSerial);
+    
     HeartBeatMillis = millis();
   }
 }
@@ -350,24 +371,52 @@ void LCDshowHeartBeat() {
 void SendCommandToSensorAndSetReturnGVVariables(String command) {
   char Ccommand[20];
   byte code = 0;                   //used to hold the I2C response code.
-  command[0] = tolower(command[0]);
-  command=AddCarrageReturnIfNeeded(command);
-  command.toCharArray(Ccommand,20);
-  Wire.beginTransmission(DOxSensorAddress);                              //call the circuit by its ID number.
+  String SensorCommand;
+  int channel;
+  
+  if (CODE_FOR_DOx_DEVICE){
+    SensorCommand = command;
+    channel = DOxSensorAddress;
+  }
+  if (CODE_FOR_TEMPSALINITY_DEVICE){
+      int colonCharIndex = command.indexOf(':');
+      String tempStr = command.substring(0,colonCharIndex);
+      channel = tempStr.toInt();
+      SensorCommand = command.substring(colonCharIndex+1,command.length());
+      Serial.println(channel);
+      Serial.println(SensorCommand);
+  }
+
+  SensorCommand[0] = tolower(SensorCommand[0]);
+  command=AddCarrageReturnIfNeeded(SensorCommand);
+  SensorCommand.toCharArray(Ccommand,20);
+  Wire.beginTransmission(channel);                                 //call the circuit by its ID number.
   Wire.write(Ccommand);                                            //transmit the command that was sent through the serial port.
   Wire.endTransmission();                                          //end the I2C data transmission.
+    
+  //command[0] = tolower(command[0]);
+  //command=AddCarrageReturnIfNeeded(command);
+  //command.toCharArray(Ccommand,20);
+  //Wire.beginTransmission(DOxSensorAddress);                        //call the circuit by its ID number.
+  //Wire.write(Ccommand);                                            //transmit the command that was sent through the serial port.
+  //Wire.endTransmission();                                          //end the I2C data transmission.
  
   if (DBUG){ Serial.print("DOc command:("); Serial.print(Ccommand); Serial.print(")"); }
 
-  if (Ccommand[0] == 'c' || Ccommand[0] == 'r' || Ccommand[0] == 'n')time_ = 600;     //if a command has been sent to calibrate or take a reading we wait 600ms so that the circuit has time to take the reading.
-  else time_ = 300;                                             //if not 300ms will do
+  if (CODE_FOR_DOx_DEVICE){
+    if (Ccommand[0] == 'c' || Ccommand[0] == 'r' || Ccommand[0] == 'n')time_ = 600;     //if a command has been sent to calibrate or take a reading we wait 600ms so that the circuit has time to take the reading.
+    else time_ = 300;                                                                   //if not 300ms will do
+  }
+   if (CODE_FOR_TEMPSALINITY_DEVICE){
+      time_ = 1000;
+  }                                            
     
   //if (strcmp(computerdata, "sleep") != 0) {  //if the command that has been sent is NOT the sleep command, wait the correct amount of time and request data.
   //if it is the sleep command, we do nothing. Issuing a sleep command and then requesting data will wake the D.O. circuit.
 
   delay(time_);                     //wait the correct amount of time for the circuit to complete its instruction.
 
-  Wire.requestFrom(DOxSensorAddress, 20, 1); //call the circuit and request 20 bytes (this may be more than we need)
+  Wire.requestFrom(channel, 20, 1); //call the circuit and request 20 bytes (this may be more than we need)
   code = Wire.read();               //the first byte is the response code, we read this separately.
 
   switch (code) {                   //switch case based on what the response code is.
@@ -410,7 +459,7 @@ void SendCommandToSensorAndSetReturnGVVariables(String command) {
   GV_WEB_RESPONSE_TEXT=GV_SENSOR_DATA + "," + GV_SENSOR_RESPONSE;
 
   if (Ccommand[0] == 'n' && Ccommand[5] != '?'){              // someone sent the name,TheName to the DO cercuit (not just querying the name,?).
-    GV_QUERY_DO_NAME_ON_NEXT_COMMAND = true;    
+    GV_QUERY_SENSOR_NAME_ON_NEXT_COMMAND = true;    
   }
   
   if ( DBUG==2 || (DBUG==1 && GV_THIS_IS_A_SERIAL_COMMAND) ){
