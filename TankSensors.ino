@@ -11,8 +11,8 @@ const int DBUG = 0;          // Set this to 0 for no serial output for debugging
 //----------------------------
 
 //-----------[ CUSTOMIZE ]----------------
-bool CODE_FOR_DOx_DEVICE          = false;
-bool CODE_FOR_TEMPSALINITY_DEVICE = true;
+bool CODE_FOR_DOx_DEVICE          = true;
+bool CODE_FOR_TEMPSALINITY_DEVICE = false;
 const char* ssid                  = "HOME-55A2";
 const char* password              = "3E7D73F4CED37FAC";
 float GV_DOx_TOOHIGHVALUE         = 10.00;
@@ -31,6 +31,8 @@ bool GV_READ_REQUEST_IN_PROGRESS = false;
 bool GV_THIS_IS_A_SERIAL_COMMAND = false;
 bool GV_QUERY_SENSOR_NAME_ON_NEXT_COMMAND = true;   // Loop tests first to see if we need to query the DO for it's name.  Set to true to do this first thing
 int GV_FIND=0;
+bool GV_GROUPFIND=false;
+int GV_GROUPCOLOR[3];
 bool GV_BOOTING_UP = true;
 //----------------------------------------
 
@@ -147,12 +149,83 @@ void setup() {
     request->send(200, "text/plain", "Find Off");
     }); 
 
+ //-----------------[ send web page]-------------------------------
+  // Send a GET request to <IP>/get?message=<message>
+  server.on("/set", HTTP_GET, [] (AsyncWebServerRequest * request) {
+    String message;
+    if (request->hasParam(PARAM_MESSAGE)) {
+      message = request->getParam(PARAM_MESSAGE)->value();
+    } else {
+      message = "No message sent";
+    }
+    request->send(200, "text/plain", "Veriable Set");
+
+    SetVariableFromWebRequest(message);
+    });
+
+ //-----------------[ send web page]-------------------------------
+  // Send a GET request to <IP>/get?message=<message>
+  server.on("/groupfind", HTTP_GET, [] (AsyncWebServerRequest * request) {
+    String message;
+    if (request->hasParam(PARAM_MESSAGE)) {
+      message = request->getParam(PARAM_MESSAGE)->value();
+    } else {
+      message = "No message sent";
+    }
+    request->send(200, "text/plain", "Group Find On");
+
+    int Comma1CharIndex = message.indexOf(',');
+    String tempStr = message.substring(0,Comma1CharIndex);
+    int r = tempStr.toInt();
+    int Comma2CharIndex = message.indexOf(',',Comma1CharIndex+1);
+    tempStr = message.substring(Comma1CharIndex+1,Comma2CharIndex);
+    int g = tempStr.toInt();
+    tempStr = message.substring(Comma2CharIndex+1,message.length());
+    int b = tempStr.toInt(); 
+
+    GV_GROUPCOLOR[0] = r;
+    GV_GROUPCOLOR[1] = g;
+    GV_GROUPCOLOR[2] = b; 
+    GV_GROUPFIND=true;   
+    });    
+
+  //---------------[ FIND web page ON ]----------------------------
+  server.on("/groupfindoff", HTTP_GET, [](AsyncWebServerRequest * request) {
+    GV_GROUPFIND=false;
+    LED_Clear();
+    request->send(200, "text/plain", "Group Find Off");
+    });
+    
   server.begin();
  
   //----------------------------------------------------------------------------------------
 }
 //=======================================[ SETUP: END ]=============================================
 
+void SetVariableFromWebRequest(String SetVarCommand){
+  SetVarCommand.toLowerCase();
+
+  int colonCharIndex = SetVarCommand.indexOf(':');
+  String tempStr = SetVarCommand.substring(0,colonCharIndex);
+  tempStr.toLowerCase();
+  if(tempStr == "doxmax"){
+    String tempVal = SetVarCommand.substring(colonCharIndex+1,SetVarCommand.length()); 
+    GV_DOx_TOOHIGHVALUE = tempVal.toFloat();
+  }   
+  if(tempStr == "doxmin"){
+    String tempVal = SetVarCommand.substring(colonCharIndex+1,SetVarCommand.length()); 
+    GV_DOx_TOOLOWVALUE = tempVal.toFloat();
+  }
+}
+
+
+void LED_Show_Group_Find_Color(int color[3]){
+  fill_solid(leds, LED_NUMBER_OF_LEDS, CRGB(color[0],  color[1],  color[2]));   //white
+  FastLED.show();
+}
+
+//char[] chArray = "some characters";
+//String str(chArray);
 
 //-------------------------------[ Variables used in LOOP ]------------
 char computerdata[20];           //we make a 20 byte character array to hold incoming data from a pc/mac/other.
@@ -177,6 +250,11 @@ void loop() {
     }
     LED_Clear();
     FastLED.setBrightness(LED_DEFAULT_BRIGHTNESS);
+  }
+
+  if (GV_GROUPFIND){    
+    LED_Show_Group_Find_Color(GV_GROUPCOLOR);
+    while(GV_GROUPFIND){ }
   }
 
   
